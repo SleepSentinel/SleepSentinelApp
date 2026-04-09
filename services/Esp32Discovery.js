@@ -2,9 +2,22 @@ import Constants from "expo-constants";
 
 const WEBSOCKET_PATH = "/ws";
 const WEBSOCKET_PORT = 80;
-const PROBE_TIMEOUT_MS = 900;
+const PROBE_TIMEOUT_MS = 1500;
 const PROBE_CONCURRENCY = 24;
 const FALLBACK_SUBNETS = ["192.168.0", "192.168.1", "192.168.2", "10.0.0"];
+const DISCOVERY_REQUEST = JSON.stringify({
+  type: "sleepsentinel.discovery",
+  action: "identify",
+});
+const NUMBER_TELEMETRY_FIELDS = [
+  "heartRate",
+  "spo2",
+  "bodyTemperature",
+  "roomTemperature",
+  "roomHumidity",
+  "airQuality",
+];
+const BOOLEAN_TELEMETRY_FIELDS = ["roomSensorOk", "isMoving", "isCrying"];
 
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
@@ -55,6 +68,53 @@ function createCandidateUrls(subnets) {
   );
 }
 
+function parseJsonMessage(message) {
+  if (typeof message !== "string") return null;
+
+  try {
+    return JSON.parse(message);
+  } catch {
+    return null;
+  }
+}
+
+function isObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isFiniteNumber(value) {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isSleepSentinelHello(payload) {
+  if (!isObject(payload)) return false;
+
+  const type = typeof payload.type === "string" ? payload.type.toLowerCase() : "";
+  const device = typeof payload.device === "string" ? payload.device.toLowerCase() : "";
+  const product = typeof payload.product === "string" ? payload.product.toLowerCase() : "";
+
+  return (
+    type === "sleepsentinel.hello" ||
+    type === "sleepsentinel.discovery.response" ||
+    device === "sleepsentinel-esp32" ||
+    product === "sleepsentinel"
+  );
+}
+
+function isSleepSentinelTelemetry(payload) {
+  if (!isObject(payload)) return false;
+
+  return (
+    NUMBER_TELEMETRY_FIELDS.every((field) => isFiniteNumber(payload[field])) &&
+    BOOLEAN_TELEMETRY_FIELDS.every((field) => typeof payload[field] === "boolean")
+  );
+}
+
+function isSleepSentinelEndpointMessage(message) {
+  const payload = parseJsonMessage(message);
+  return isSleepSentinelHello(payload) || isSleepSentinelTelemetry(payload);
+}
+
 function probeWebSocket(url, signal) {
   return new Promise((resolve) => {
     if (signal?.aborted) {
@@ -85,7 +145,18 @@ function probeWebSocket(url, signal) {
 
     try {
       socket = new WebSocket(url);
-      socket.onopen = () => finish(true);
+      socket.onopen = () => {
+        try {
+          socket.send(DISCOVERY_REQUEST);
+        } catch {
+          // Some firmware may ignore probes and stream telemetry instead.
+        }
+      };
+      socket.onmessage = (event) => {
+        if (isSleepSentinelEndpointMessage(event.data)) {
+          finish(true);
+        }
+      };
       socket.onerror = () => finish(false);
       socket.onclose = () => finish(false);
     } catch (error) {
