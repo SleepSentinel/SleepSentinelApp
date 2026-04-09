@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { discoverEsp32WebSocket } from "../services/Esp32Discovery";
 import wsService from "../services/WebSocketService";
 
 export default function HomeScreen() {
@@ -19,14 +20,42 @@ export default function HomeScreen() {
   const [data, setData] = useState<SystemState | null>(null);
 
   useEffect(() => {
-    const wsUrl = "ws://192.168.2.78/ws"; // the ESP32 IP
+    const controller = new AbortController();
+    let isMounted = true;
 
     wsService.setStatusCallback(setStatus);
     wsService.setMessageCallback(setData);
 
-    wsService.connect(wsUrl);
+    async function connectToEsp32() {
+      try {
+        const wsUrl = await discoverEsp32WebSocket({
+          signal: controller.signal,
+          onStatus: (nextStatus: string) => {
+            if (isMounted) setStatus(nextStatus);
+          },
+        });
+
+        if (!isMounted || controller.signal.aborted) return;
+
+        if (!wsUrl) {
+          setStatus("ESP32 not found");
+          return;
+        }
+
+        wsService.connect(wsUrl);
+      } catch (error) {
+        console.log("ESP32 discovery failed", error);
+        if (isMounted && !controller.signal.aborted) {
+          setStatus("ESP32 discovery failed");
+        }
+      }
+    }
+
+    connectToEsp32();
 
     return () => {
+      isMounted = false;
+      controller.abort();
       wsService.disconnect();
     };
   }, []);

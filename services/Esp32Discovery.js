@@ -1,0 +1,130 @@
+import Constants from "expo-constants";
+
+const WEBSOCKET_PATH = "/ws";
+const WEBSOCKET_PORT = 80;
+const PROBE_TIMEOUT_MS = 900;
+const PROBE_CONCURRENCY = 24;
+const FALLBACK_SUBNETS = ["192.168.0", "192.168.1", "192.168.2", "10.0.0"];
+
+function unique(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function extractIPv4(value) {
+  if (!value || typeof value !== "string") return null;
+
+  const match = value.match(/\b(\d{1,3}(?:\.\d{1,3}){3})\b/);
+  if (!match) return null;
+
+  const octets = match[1].split(".").map(Number);
+  if (octets.some((octet) => Number.isNaN(octet) || octet < 0 || octet > 255)) {
+    return null;
+  }
+
+  return match[1];
+}
+
+function getSubnet(ipAddress) {
+  if (!ipAddress || typeof ipAddress !== "string") return null;
+
+  const octets = ipAddress.split(".");
+  return octets.length === 4 ? octets.slice(0, 3).join(".") : null;
+}
+
+function getExpoHostCandidates() {
+  return [
+    Constants.expoConfig?.hostUri,
+    Constants.manifest?.debuggerHost,
+    Constants.manifest?.hostUri,
+    Constants.manifest2?.extra?.expoClient?.hostUri,
+    Constants.manifest2?.extra?.expoGo?.debuggerHost,
+  ];
+}
+
+export function getCandidateSubnets() {
+  const expoSubnets = getExpoHostCandidates().map(extractIPv4).map(getSubnet).filter(Boolean);
+  return unique([...expoSubnets, ...FALLBACK_SUBNETS]);
+}
+
+function createCandidateUrls(subnets) {
+  return subnets.flatMap((subnet) =>
+    Array.from(
+      { length: 253 },
+      (_, index) => `ws://${subnet}.${index + 2}:${WEBSOCKET_PORT}${WEBSOCKET_PATH}`,
+    ),
+  );
+}
+
+function probeWebSocket(url, signal) {
+  return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve(false);
+      return;
+    }
+
+    let socket;
+    let settled = false;
+
+    const finish = (isAvailable) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      signal?.removeEventListener("abort", handleAbort);
+
+      if (socket && socket.readyState !== WebSocket.CLOSED) {
+        socket.close();
+      }
+
+      resolve(isAvailable);
+    };
+
+    const handleAbort = () => finish(false);
+    const timeout = setTimeout(() => finish(false), PROBE_TIMEOUT_MS);
+
+    signal?.addEventListener("abort", handleAbort);
+
+    try {
+      socket = new WebSocket(url);
+      socket.onopen = () => finish(true);
+      socket.onerror = () => finish(false);
+      socket.onclose = () => finish(false);
+    } catch (error) {
+      finish(false);
+    }
+  });
+}
+
+export async function discoverEsp32WebSocket({ onStatus, signal } = {}) {
+  const subnets = getCandidateSubnets();
+  const urls = createCandidateUrls(subnets);
+  const discoveryController = new AbortController();
+  const abortDiscovery = () => discoveryController.abort();
+
+  signal?.addEventListener("abort", abortDiscovery);
+  onStatus?.(`discovering ESP32 on ${subnets.join(", ")}.x`);
+
+  try {
+    let nextIndex = 0;
+
+    async function worker() {
+      while (!discoveryController.signal.aborted && nextIndex < urls.length) {
+        const url = urls[nextIndex];
+        nextIndex += 1;
+
+        const isAvailable = await probeWebSocket(url, discoveryController.signal);
+        if (isAvailable) {
+          discoveryController.abort();
+          return url;
+        }
+      }
+
+      return null;
+    }
+
+    const workers = Array.from({ length: PROBE_CONCURRENCY }, worker);
+    const results = await Promise.all(workers);
+    return results.find(Boolean) ?? null;
+  } finally {
+    signal?.removeEventListener("abort", abortDiscovery);
+  }
+}
