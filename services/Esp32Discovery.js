@@ -4,7 +4,29 @@ const WEBSOCKET_PATH = "/ws";
 const WEBSOCKET_PORT = 80;
 const PROBE_TIMEOUT_MS = 1500;
 const PROBE_CONCURRENCY = 24;
-const FALLBACK_SUBNETS = ["192.168.0", "192.168.1", "192.168.2", "10.0.0"];
+const FALLBACK_192_168_THIRD_OCTETS = [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  10,
+  20,
+  30,
+  40,
+  50,
+  86,
+  88,
+  100,
+  101,
+  178,
+  188,
+  254,
+];
+const FALLBACK_172_SECOND_OCTETS = Array.from({ length: 16 }, (_, index) => index + 16);
+const FALLBACK_10_SUBNETS = ["10.0.0", "10.0.1", "10.1.0", "10.10.0"];
+const FALLBACK_SUBNETS = buildFallbackSubnets();
 const DISCOVERY_REQUEST = JSON.stringify({
   type: "sleepsentinel.discovery",
   action: "identify",
@@ -21,6 +43,14 @@ const BOOLEAN_TELEMETRY_FIELDS = ["roomSensorOk", "isMoving", "isCrying"];
 
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
+}
+
+function buildFallbackSubnets() {
+  return unique([
+    ...FALLBACK_192_168_THIRD_OCTETS.map((thirdOctet) => `192.168.${thirdOctet}`),
+    ...FALLBACK_172_SECOND_OCTETS.map((secondOctet) => `172.${secondOctet}.0`),
+    ...FALLBACK_10_SUBNETS,
+  ]);
 }
 
 function extractIPv4(value) {
