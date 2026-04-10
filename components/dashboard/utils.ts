@@ -24,21 +24,58 @@ export function formatFreshness(secondsSinceUpdate: number | null, status: strin
   return `${secondsSinceUpdate}s ago`;
 }
 
+export function formatConnectionStatus(status: string) {
+  const normalizedStatus = status.trim();
+  const lowerStatus = normalizedStatus.toLowerCase();
+
+  if (lowerStatus === "connected") return "Connected";
+  if (lowerStatus === "connecting") return "Connecting";
+  if (lowerStatus.startsWith("connecting to ")) return "Connecting to ESP32";
+  if (lowerStatus.startsWith("discovering esp32")) return "Discovering ESP32";
+  if (lowerStatus === "esp32 not found") return "ESP32 not found";
+  if (lowerStatus === "esp32 discovery failed") return "Discovery failed";
+  if (lowerStatus === "error") return "Connection error";
+  if (lowerStatus === "disconnected") return "Disconnected";
+
+  return normalizedStatus || "Disconnected";
+}
+
 export function getConnectionTone(status: string): Tone {
-  switch (status) {
+  const lowerStatus = status.trim().toLowerCase();
+
+  if (
+    lowerStatus === "connecting" ||
+    lowerStatus.startsWith("connecting to ") ||
+    lowerStatus.startsWith("discovering esp32")
+  ) {
+    return {
+      background: "rgba(250, 204, 21, 0.12)",
+      border: "rgba(250, 204, 21, 0.28)",
+      text: "#FACC15",
+      dot: "#FACC15",
+    };
+  }
+
+  if (
+    lowerStatus === "error" ||
+    lowerStatus === "esp32 not found" ||
+    lowerStatus === "esp32 discovery failed"
+  ) {
+    return {
+      background: "rgba(255, 32, 86, 0.1)",
+      border: "rgba(255, 32, 86, 0.3)",
+      text: "#FF7A8C",
+      dot: "#FF2056",
+    };
+  }
+
+  switch (lowerStatus) {
     case "connected":
       return {
         background: "rgba(16, 185, 129, 0.12)",
         border: "rgba(52, 211, 153, 0.35)",
         text: "#50E3B3",
         dot: "#34D399",
-      };
-    case "connecting":
-      return {
-        background: "rgba(250, 204, 21, 0.12)",
-        border: "rgba(250, 204, 21, 0.28)",
-        text: "#FACC15",
-        dot: "#FACC15",
       };
     default:
       return {

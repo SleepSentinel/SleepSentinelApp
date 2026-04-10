@@ -21,6 +21,7 @@ import {
 } from "./original-icons";
 import { SystemState } from "./types";
 import {
+  formatConnectionStatus,
   formatFreshness,
   getAirQualityInfo,
   getBodyTempInfo,
@@ -37,6 +38,7 @@ export function DashboardHeader({
   secondsSinceUpdate: number | null;
 }) {
   const tone = getConnectionTone(status);
+  const statusLabel = formatConnectionStatus(status);
 
   return (
     <View style={styles.headerBlock}>
@@ -59,11 +61,7 @@ export function DashboardHeader({
         >
           <View style={[styles.statusDot, { backgroundColor: tone.dot }]} />
           <Text style={[styles.statusText, { color: tone.text }]}>
-            {status === "connected"
-              ? "Connected"
-              : status === "connecting"
-                ? "Connecting"
-                : "Disconnected"}
+            {statusLabel}
           </Text>
         </View>
 
