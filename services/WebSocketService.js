@@ -6,10 +6,12 @@ class WebSocketService {
   }
 
   connect(url) {
+    this.disconnect();
     this.ws = new WebSocket(url);
+    if (this.onStatus) this.onStatus(`connecting to ${url}`);
 
     this.ws.onopen = () => {
-      console.log("WebSocket connected");
+      console.log("WebSocket connected:", url);
       if (this.onStatus) this.onStatus("connected");
     };
 
@@ -22,13 +24,13 @@ class WebSocketService {
       }
     };
 
-    this.ws.onclose = () => {
-      console.log("WebSocket disconnected");
+    this.ws.onclose = (event) => {
+      console.log("WebSocket disconnected", event);
       if (this.onStatus) this.onStatus("disconnected");
     };
 
-    this.ws.onerror = () => {
-      console.log("WebSocket error");
+    this.ws.onerror = (event) => {
+      console.log("WebSocket error", event);
       if (this.onStatus) this.onStatus("error");
     };
   }
@@ -43,7 +45,16 @@ class WebSocketService {
 
   disconnect() {
     if (this.ws) {
-      this.ws.close();
+      const socket = this.ws;
+      this.ws = null;
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onclose = null;
+      socket.onerror = null;
+
+      if (socket.readyState !== WebSocket.CLOSED && socket.readyState !== WebSocket.CLOSING) {
+        socket.close();
+      }
     }
   }
 }
