@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import Svg, { Circle, Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
+import { getActiveAlertTypes, getAlertMessage } from "@/services/AlertService";
 import {
   AirQualityIcon,
   BabyIcon,
@@ -71,6 +72,28 @@ export function DashboardHeader({
             {formatFreshness(secondsSinceUpdate, status)}
           </Text>
         </View>
+      </View>
+    </View>
+  );
+}
+
+export function ActiveAlertsBanner({ data }: { data: SystemState | null }) {
+  const activeAlerts = getActiveAlertTypes(data);
+
+  if (activeAlerts.length === 0) {
+    return null;
+  }
+
+  return (
+    <View style={styles.alertBanner}>
+      <Text style={styles.alertBannerTitle}>ACTIVE ALERTS</Text>
+      <View style={styles.alertList}>
+        {activeAlerts.map((alertType) => (
+          <View key={alertType} style={styles.alertRow}>
+            <View style={styles.alertDot} />
+            <Text style={styles.alertText}>{getAlertMessage(alertType)}</Text>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -682,6 +705,41 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 2.4,
+  },
+  alertBanner: {
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: "rgba(255, 32, 86, 0.11)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 32, 86, 0.28)",
+  },
+  alertBannerTitle: {
+    color: "#FF7A8C",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 2,
+  },
+  alertList: {
+    marginTop: 10,
+    gap: 8,
+  },
+  alertRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  alertDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginRight: 8,
+    backgroundColor: "#FF2056",
+  },
+  alertText: {
+    flex: 1,
+    color: "#F8FAFC",
+    fontSize: 13,
+    fontWeight: "700",
   },
   gaugeWrap: {
     alignItems: "center",
