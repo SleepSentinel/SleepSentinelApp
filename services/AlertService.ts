@@ -38,12 +38,50 @@ function normalizeAlertType(value: unknown): string | null {
   return trimmedValue.length > 0 ? trimmedValue : null;
 }
 
+function getAlertActiveValue(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value > 0 : false;
+  }
+
+  if (typeof value !== "string") return null;
+
+  switch (value.trim().toLowerCase()) {
+    case "active":
+    case "true":
+    case "1":
+    case "yes":
+    case "on":
+    case "triggered":
+      return true;
+    case "inactive":
+    case "false":
+    case "0":
+    case "no":
+    case "off":
+    case "clear":
+    case "cleared":
+    case "normal":
+      return false;
+    default:
+      return null;
+  }
+}
+
 function getAlertTypeFromEntry(entry: unknown): string | null {
   if (typeof entry === "string") return normalizeAlertType(entry);
   if (!isRecord(entry)) return null;
 
   const activeValue = entry.active ?? entry.isActive ?? entry.triggered;
-  if (activeValue === false) return null;
+  if (activeValue !== undefined && getAlertActiveValue(activeValue) !== true) {
+    return null;
+  }
+
+  const stateValue = entry.state ?? entry.status;
+  if (stateValue !== undefined && getAlertActiveValue(stateValue) !== true) {
+    return null;
+  }
 
   return (
     normalizeAlertType(entry.type) ??
@@ -55,25 +93,17 @@ function getAlertTypeFromEntry(entry: unknown): string | null {
 }
 
 function isAlertEntryActive(value: unknown): boolean {
-  if (typeof value === "boolean") return value;
-
-  if (typeof value === "number") {
-    return Number.isFinite(value) && value > 0;
-  }
-
-  if (typeof value === "string") {
-    return value.trim().toLowerCase() === "active";
-  }
+  const directActiveValue = getAlertActiveValue(value);
+  if (directActiveValue !== null) return directActiveValue;
 
   if (!isRecord(value)) return false;
 
   const activeValue = value.active ?? value.isActive ?? value.triggered;
-  if (typeof activeValue === "boolean") return activeValue;
-  if (typeof activeValue === "number") return Number.isFinite(activeValue) && activeValue > 0;
-  if (typeof activeValue === "string") return activeValue.trim().toLowerCase() === "active";
+  const parsedActiveValue = getAlertActiveValue(activeValue);
+  if (parsedActiveValue !== null) return parsedActiveValue;
 
   const stateValue = value.state ?? value.status;
-  return typeof stateValue === "string" && stateValue.trim().toLowerCase() === "active";
+  return getAlertActiveValue(stateValue) === true;
 }
 
 function humanizeAlertType(alertType: string) {

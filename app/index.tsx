@@ -16,17 +16,10 @@ export default function HomeScreen() {
   const previousDataRef = useRef<SystemState | null>(null);
 
   useEffect(() => {
-    configureAlertNotifications().catch((error) => {
-      console.log("Notification setup failed", error);
-    });
-  }, []);
-
-  useEffect(() => {
     const controller = new AbortController();
     let isMounted = true;
 
-    wsService.setStatusCallback(setStatus);
-    wsService.setMessageCallback((incomingData: SystemState) => {
+    const handleIncomingData = (incomingData: SystemState) => {
       const previousData = previousDataRef.current;
       previousDataRef.current = incomingData;
 
@@ -37,10 +30,19 @@ export default function HomeScreen() {
       setData(incomingData);
       setLastUpdatedAt(Date.now());
       setSecondsSinceUpdate(0);
-    });
+    };
 
     async function connectToEsp32() {
       try {
+        await configureAlertNotifications().catch((error) => {
+          console.log("Notification setup failed", error);
+        });
+
+        if (!isMounted || controller.signal.aborted) return;
+
+        wsService.setStatusCallback(setStatus);
+        wsService.setMessageCallback(handleIncomingData);
+
         const wsUrl = await discoverEsp32WebSocket({
           signal: controller.signal,
           onStatus: (nextStatus: string) => {
