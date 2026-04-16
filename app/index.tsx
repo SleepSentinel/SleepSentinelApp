@@ -1,28 +1,48 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { discoverEsp32WebSocket } from "../services/Esp32Discovery";
 import wsService from "../services/WebSocketService";
 import { DashboardScreen } from "@/components/dashboard/dashboard-screen";
 import { SystemState } from "@/components/dashboard/types";
+import {
+  configureAlertNotifications,
+  notifyNewAlertTransitions,
+} from "@/services/AlertService";
 
 export default function HomeScreen() {
   const [status, setStatus] = useState("connecting");
   const [data, setData] = useState<SystemState | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [secondsSinceUpdate, setSecondsSinceUpdate] = useState<number | null>(null);
+  const previousDataRef = useRef<SystemState | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
     let isMounted = true;
 
-    wsService.setStatusCallback(setStatus);
-    wsService.setMessageCallback((incomingData: SystemState) => {
+    const handleIncomingData = (incomingData: SystemState) => {
+      const previousData = previousDataRef.current;
+      previousDataRef.current = incomingData;
+
+      notifyNewAlertTransitions(previousData, incomingData).catch((error) => {
+        console.log("Alert notification failed", error);
+      });
+
       setData(incomingData);
       setLastUpdatedAt(Date.now());
       setSecondsSinceUpdate(0);
-    });
+    };
 
     async function connectToEsp32() {
       try {
+        await configureAlertNotifications().catch((error) => {
+          console.log("Notification setup failed", error);
+        });
+
+        if (!isMounted || controller.signal.aborted) return;
+
+        wsService.setStatusCallback(setStatus);
+        wsService.setMessageCallback(handleIncomingData);
+
         const wsUrl = await discoverEsp32WebSocket({
           signal: controller.signal,
           onStatus: (nextStatus: string) => {

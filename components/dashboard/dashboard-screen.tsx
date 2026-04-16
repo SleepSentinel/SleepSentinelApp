@@ -4,6 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 import {
   AirQualityCard,
+  ActiveAlertsBanner,
   BodyTemperatureCard,
   CryAlertCard,
   DashboardHeader,
@@ -42,6 +43,7 @@ export function DashboardScreen({
         showsVerticalScrollIndicator={false}
       >
         <DashboardHeader status={status} secondsSinceUpdate={secondsSinceUpdate} />
+        <ActiveAlertsBanner data={data} />
 
         <View style={styles.row}>
           <HeartRateCard data={data} />
