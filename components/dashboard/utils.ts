@@ -213,46 +213,55 @@ export function getAirQualityInfo(value?: number) {
     };
   }
 
-  if (value <= 50) {
+  if (value <= 150) {
     return {
       label: "Excellent",
       textColor: "#38E2BA",
-      progress: clamp(value / 300, 0, 1),
+      progress: clamp(value / 900, 0, 1),
       colors: ["#00D492", "#27E0B9"] as [string, string],
     };
   }
 
-  if (value <= 100) {
+  if (value <= 300) {
     return {
       label: "Good",
       textColor: "#88E56B",
-      progress: clamp(value / 300, 0, 1),
+      progress: clamp(value / 900, 0, 1),
       colors: ["#7ED957", "#22C55E"] as [string, string],
     };
   }
 
-  if (value <= 150) {
+  if (value <= 500) {
     return {
       label: "Average",
       textColor: "#FDC700",
-      progress: clamp(value / 300, 0, 1),
+      progress: clamp(value / 900, 0, 1),
       colors: ["#FFD166", "#FDC700"] as [string, string],
     };
   }
 
-  if (value <= 200) {
+  if (value <= 700) {
     return {
       label: "Poor",
       textColor: "#FF9C5F",
-      progress: clamp(value / 300, 0, 1),
+      progress: clamp(value / 900, 0, 1),
       colors: ["#FFB347", "#FF8904"] as [string, string],
     };
   }
 
+  if (value <= 900) {
+    return {
+      label: "Bad",
+      textColor: "#FF7A8C",
+      progress: clamp(value / 900, 0, 1),
+      colors: ["#FF7A6E", "#FF2056"] as [string, string],
+    };
+  }
+
   return {
-    label: "Very Poor",
+    label: "Dangerous",
     textColor: "#FF7A8C",
-    progress: clamp(value / 300, 0, 1),
+    progress: clamp(value / 900, 0, 1),
     colors: ["#FF7A6E", "#FF2056"] as [string, string],
   };
 }
